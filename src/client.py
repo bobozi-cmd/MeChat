@@ -1,5 +1,6 @@
 from socket import socket, AF_INET, SOCK_DGRAM
 
+from message import MeMsgType, MeMessage, pack_msg, unpack_msg
 
 class MeChatClient():
 
@@ -12,22 +13,55 @@ class MeChatClient():
         self._client = socket(AF_INET, SOCK_DGRAM)
         self._client.settimeout(10)
         self.name = name
-        self._client.sendto(f"register: {name}".encode('utf-8'), self.addr)
+        msg = MeMessage(MeMsgType.REGISTER, f"{name}")
+        self._client.sendto(pack_msg(msg), self.addr)
         
         # wait for response or failed
         try:
-            resp = self._client.recvfrom(4096)[0].decode('utf-8')
+            resp: MeMessage = unpack_msg(self._client.recvfrom(4096)[0])
         except TimeoutError as e:
             print("MeChat Server disconnect!")
             exit(-1)
 
-        resp_toks = resp.split(':')
-        if resp_toks[0].strip() != 'register':
-            print(f"Error Response: {resp}")
+        assert resp.msg_type == MeMsgType.REGISTER
+        assert resp.msg == 'ok'
+
+        print("Register Success!")
+
+    def select_talkmate(self):
+        msg = MeMessage(MeMsgType.SELECT, "")
+        self._client.sendto(pack_msg(msg), self.addr)
+        try:
+            resp: MeMessage = unpack_msg(self._client.recvfrom(4096)[0])
+        except TimeoutError as e:
+            print("MeChat Server disconnect!")
             exit(-1)
-        if resp_toks[1].strip() != 'ok':
-            print(f"Failed to Connect to server: {resp}")
+
+        assert resp.msg_type == MeMsgType.SELECT
+
+        users: list = eval(resp.msg)
+        users.remove(self.name)
+        
+        while True:
+            print(f"Please select the user to talk:")
+            for i, user in enumerate(users):
+                print(f"({i}) {user}")
+            idx = input("Please input the number of user:")
+            if idx.isdigit() and int(idx) >= 0 and int(idx) < len(users):
+                break
+        msg = MeMessage(MeMsgType.SELECT, f"{users[int(idx)]}")
+        self._client.sendto(pack_msg(msg), self.addr)
+        try:
+            resp: MeMessage = unpack_msg(self._client.recvfrom(4096)[0])
+        except TimeoutError as e:
+            print("MeChat Server disconnect!")
             exit(-1)
+        
+        assert resp.msg_type == MeMsgType.SELECT
+        assert resp.msg == 'ok'
+
+        print("Select Success!")
+
 
     def run(self):
         if self._client == None:
@@ -35,14 +69,15 @@ class MeChatClient():
             exit(-1)
 
         while True:
-            msg = input("client>")
-            self._client.sendto(f"message: {msg}".encode('utf-8'), self.addr)
+            msg_content = input("client>")
+            msg = MeMessage(MeMsgType.MESSAGE, msg_content)
+            self._client.sendto(pack_msg(msg), self.addr)
             
             try:
-                resp = self._client.recvfrom(4096)[0].decode('utf-8')
+                resp: MeMessage = unpack_msg(self._client.recvfrom(4096)[0])
             except TimeoutError:
                 print("MeChat Server disconnect!")
                 exit(-1)
                 
-            print(f'server:{resp}')
+            print(f'{resp.msg}')
 

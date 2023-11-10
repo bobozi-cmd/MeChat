@@ -25,6 +25,8 @@ def run_server(args):
 def run_client(args):
     mechat_client = MeChatClient(args.host, args.port)
     mechat_client.register(args.name)
+    if args.state == "pos":
+        mechat_client.select_talkmate()
     mechat_client.run()
 
 
@@ -41,6 +43,7 @@ def main():
     client_p.add_argument("-H", "--host", help="Client host address", required=True, type=str)
     client_p.add_argument("-P", "--port", help="Client port number", default=18888, type=int)
     client_p.add_argument("-N", "--name", help="Client Name", type=str, default=f'cli_{int(datetime.datetime.today().timestamp())}')
+    client_p.add_argument("-S", "--state", help="Client State", type=str, required=True)
 
     args = parser.parse_args()
 
