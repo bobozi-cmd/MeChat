@@ -1,4 +1,4 @@
-import socket, threading, queue, logging, datetime, sys
+import socket, threading, queue, logging, datetime, sys, time
 from traceback import print_tb
 
 from mechat_message import *
@@ -61,11 +61,10 @@ class MeChatServer(threading.Thread):
     def unregister_user(self, username: str):
         with self.users_lock:
             self.users_list.pop(username, None)
-        logging.info(f"{username} exited!\n{self.users_list}")
+        logging.info(f"{username} exited!")
 
     def unregister_user_by_conn(self, conn: socket.socket | _Address):
         target = None
-        logging.info(f"{conn} exited!\n")
         with self.users_lock:
             target = self.find_user(conn)
 
@@ -82,10 +81,11 @@ class MeChatServer(threading.Thread):
             MeMessageType.REGISTER, "system >\n OK!"
         )
         conn.send(MeMessage.serialize(ret_msg))
-        # welcome_msg = MeMessage(
-        #     MeMessageType.MESSAGE, f"system >\n Welcome {username}!"
-        # )
-        # self.broadcast("system", MeMessage.serialize(welcome_msg))
+        
+        welcome_msg = MeMessage(
+            MeMessageType.MESSAGE, f"system >\n Welcome {username}!"
+        )
+        self.broadcast("system", MeMessage.serialize(welcome_msg))
         return username
 
     def show_online_user(self) -> list[str]:
@@ -114,7 +114,9 @@ class MeChatServer(threading.Thread):
             try:
                 msg_b = conn.recv(msg_limit)
                 msg = MeMessage.deserialize(msg_b)
-                assert msg.msg_type != MeMessageType.ERROR
+                if msg.msg_type == MeMessageType.ERROR:
+                    logging.error(f"Error: {msg}")
+                    break
 
                 logging.debug(f"[{username}] : {msg}")
                 if username == None:
@@ -128,9 +130,9 @@ class MeChatServer(threading.Thread):
             except:
                 ttype, tvalue, ttraceback = sys.exc_info()
                 print_tb(ttraceback)
-                self.unregister_user_by_conn(addr)
-                conn.close()
-                exit(-1)
+                break
+        self.unregister_user_by_conn(addr)
+        conn.close()
 
     def run(self):
         self._server.bind(self.addr)

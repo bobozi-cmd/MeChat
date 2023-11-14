@@ -44,12 +44,12 @@ class MeChatClient():
             msg_b = self._client.recv(msg_limit)
             msg = MeMessage.deserialize(msg_b)
             if msg.msg_type == MeMessageType.REGISTER:
-                if msg.msg == 'system >\n OK!':
-                    registered = True
+                # if msg.msg == 'system >\n OK!':
+                registered = True
             elif msg.msg_type == MeMessageType.ERROR:
-                    print(f"{msg.ctime} {msg}")
-                    self._client.close()
-                    exit(-1)
+                print(f"{msg.ctime} {msg}")
+                self._client.close()
+                exit(-1)
         print(f"Register Successed!")
 
     def do_send(self):
@@ -82,8 +82,10 @@ class MeChatClient():
     def run(self):
         self._client.connect(self.server_addr)
         self.do_register()
+        
         recv_thr = threading.Thread(target=self.do_recv)
         recv_thr.start()
+        
         self.do_send()
         self._client.close()
         recv_thr.join()
